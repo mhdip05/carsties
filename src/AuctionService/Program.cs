@@ -1,4 +1,6 @@
+using AuctionService.Consumer;
 using AuctionService.Data;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateSlimBuilder(args);
@@ -11,6 +13,30 @@ builder.Services.AddDbContext<AuctionDbContext>(options =>
 });
 
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+// Configure Mass Transit
+builder.Services.AddMassTransit(x =>
+{
+    // Configuration for, if service bus is not responding
+    // then after every 10 it will try to reconnect
+    // in the mean time the message will save in the outbox
+    // here outbox means the database will have outbox table where data remain stored until its connected
+
+    x.AddEntityFrameworkOutbox<AuctionDbContext>(o=>
+    {
+        o.QueryDelay = TimeSpan.FromSeconds(10);
+        o.UsePostgres();
+        o.UseBusOutbox();
+    });
+
+    x.AddConsumersFromNamespaceContaining<AuctionCreatedFaultConsumer>();
+    x.SetEndpointNameFormatter(new KebabCaseEndpointNameFormatter("auction", false));
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+});
 
 var app = builder.Build();
 
@@ -27,7 +53,7 @@ try
 {
     DataInitializer.InitDb(app);
 }
-catch(Exception e)
+catch (Exception e)
 {
     Console.WriteLine(e);
 }
