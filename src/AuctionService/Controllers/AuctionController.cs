@@ -5,6 +5,7 @@ using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using Contracts;
 using MassTransit;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics.Metrics;
@@ -51,12 +52,13 @@ namespace AuctionService.Controllers
             return _mapper.Map<AuctionDto>(auction);
         }
 
+        [Authorize]
         [HttpPost]
         public async Task<ActionResult<AuctionDto>> CreateAuction(CreateAuctionDto auctionDto)
         {
             var auction = _mapper.Map<Auction>(auctionDto);
 
-            auction.Seller = "test";
+            auction.Seller = User.Identity.Name;
 
             // since we installed mastransit entity frame work 
             // these 3 line will be treated like a transaction
@@ -80,6 +82,7 @@ namespace AuctionService.Controllers
             return CreatedAtAction(nameof(GetAuctionById), new { auction.Id }, newAction);
         }
 
+        [Authorize]
         [HttpPut("{id}")]
         public async Task<ActionResult> UpdateAuction(Guid id, UpdateAuctionDto updateAuctionDto)
         {
@@ -89,6 +92,7 @@ namespace AuctionService.Controllers
             if (auction == null) return NotFound();
 
             // TODO: check seller == username
+            if (auction.Seller != User.Identity.Name) return Forbid();
 
             auction.Item.Make = updateAuctionDto.Make ?? auction.Item.Make;
             auction.Item.Model = updateAuctionDto.Model ?? auction.Item.Model;
@@ -106,6 +110,7 @@ namespace AuctionService.Controllers
             return BadRequest("Problem saving changes");
         }
 
+        [Authorize]
         [HttpDelete("{id}")]
         public async Task<ActionResult> DeleteAcution(Guid id)
         {
@@ -114,6 +119,7 @@ namespace AuctionService.Controllers
             if (auction == null) return NotFound();
 
             //TODO : check seller == username
+            if (auction.Seller != User.Identity.Name) return Forbid();
 
             _context.Auctions.Remove(auction);
 
