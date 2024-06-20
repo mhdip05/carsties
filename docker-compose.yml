@@ -7,6 +7,7 @@ services:
             - 5432:5432
         volumes:
             - /var/lib/postgresql/data
+
     mongodb:
         image: mongo
         environment:
@@ -16,8 +17,68 @@ services:
             - 27017:27017
         volumes:
             - /var/lib/mongodb/data
+
     rabbitmq:
         image: rabbitmq:3-management-alpine
         ports:
             - 5672:5672
             - 15672:15672
+
+    auction-svc:
+        image: mhdip05/auction-svc:latest
+        build:
+            context: . # we are gonna run this command from root of our directory that's why period used
+            dockerfile: src/AuctionService/Dockerfile # location of docker file
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Development
+            - ASPNETCORE_URLS=http://+:80
+            - RabbitMq__Host=rabbitmq
+            - ConnectionStrings__DefaultConnection=server=postgres;Port=5432;Database=auctions;Username=postgres;Password=123456;
+            - IdentityServiceUrl=http://identity-svc
+        ports:
+            - 7001:80
+        depends_on:
+            - postgres
+            - rabbitmq
+
+    search-svc:
+        image: mhdip05/search-svc:latest
+        build:
+            context: . # we are gonna run this command from root of our directory that's why period used
+            dockerfile: src/SearchService/Dockerfile # location of docker file
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Development
+            - ASPNETCORE_URLS=http://+:80
+            - RabbitMq__Host=rabbitmq
+            - ConnectionStrings__MongoDbConnection=mongodb://root:123456@mongodb
+            - AuctionServiceUrl=http://auction-svc
+        ports:
+            - 7002:80
+        depends_on:
+            - mongodb
+            - rabbitmq
+
+    identity-svc:
+        image: mhdip05/identity-svc:latest
+        build:
+            context: . # we are gonna run this command from root of our directory that's why period used
+            dockerfile: src/IdentityServer/Dockerfile # location of docker file
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Docker
+            - ASPNETCORE_URLS=http://+:80
+            - ConnectionStrings__DefaultConnection=server=postgres;Port=5432;Database=identity;Username=postgres;Password=123456;
+        ports:
+            - 5000:80
+        depends_on:
+            - postgres
+
+    gateway-svc:
+        image: mhdip05/gateway-svc:latest
+        build:
+            context: . # we are gonna run this command from root of our directory that's why period used
+            dockerfile: src/GatewayService/Dockerfile # location of docker file
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Docker
+            - ASPNETCORE_URLS=http://+:80
+        ports:
+            - 6001:80

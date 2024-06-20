@@ -28,6 +28,13 @@ builder.Services.AddMassTransit(x =>
 
     x.UsingRabbitMq((context, cfg) =>
     {
+
+        cfg.Host(builder.Configuration["RabbitMq:Host"], "/", host =>
+        {
+            host.Username(builder.Configuration.GetValue("RabbitMq:Username", "guest"));
+            host.Username(builder.Configuration.GetValue("RabbitMq:Password", "guest"));
+        });
+
         // what if mongo db is down. 
         cfg.ReceiveEndpoint("search-auction-created", e=>
         {
